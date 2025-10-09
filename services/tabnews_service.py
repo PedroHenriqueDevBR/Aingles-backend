@@ -2,6 +2,7 @@ import requests
 
 
 class TabNewsResponse:
+    
     def __init__(
         self,
         article_id: str,
@@ -64,8 +65,20 @@ class TabNewsService:
 
         return response
 
+    def get_post_content(self, user: str, slug: str) -> str:
+        endpoint = f"/contents/{user}/{slug}"
+        url = self.base_url + endpoint
+        res = requests.get(url, timeout=30)
+        if res.status_code < 200 or res.status_code >= 300:
+            raise ConnectionRefusedError()
+
+        article_response = res.json()
+        content = article_response.get("body", "")
+        return content
+
 
 if __name__ == "__main__":
     service = TabNewsService()
-    service.most_relevant_posts()
-    print("done")
+    posts = service.most_relevant_posts()
+    for post in posts:
+        print(f"Title: {post.title}, URL: {post.slug}")
