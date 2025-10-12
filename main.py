@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from routers import core, articles
+from routers import core, articles, card
 from services import sqlite_service
 
 
@@ -11,3 +11,4 @@ def on_startup() -> None:
 
 app.include_router(core.router)
 app.include_router(articles.router, prefix="/article")
+app.include_router(card.router, prefix="/card")
