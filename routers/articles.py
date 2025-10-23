@@ -1,8 +1,9 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Response
 from sqlmodel import select
 
 from models.article_model import Article
 from services import sqlite_service
+from services.load_articles_service import LoadArticlesService
 
 router = APIRouter()
 
@@ -37,10 +38,35 @@ def get_articles(session: sqlite_service.SessionDep) -> list[Article]:
     return articles
 
 
-@router.delete('/{article_id}/delete')
+@router.delete("/{article_id}/delete")
 def delete_article(article_id: int, session: sqlite_service.SessionDep) -> None:
     article = session.get(Article, article_id)
     if not article:
         raise HTTPException(status_code=404, detail="Article not found")
     session.delete(article)
     session.commit()
+    return Response(status_code=204)
+
+
+@router.post("/load")
+async def load_articles(
+    background_tasks: BackgroundTasks,
+    session: sqlite_service.SessionDep
+):
+    service = LoadArticlesService()
+    background_tasks.add_task(service.load_latest, session=session)
+    return Response(status_code=200)
+
+
+@router.post("/{article_id}/load_content")
+def load_article_content(
+    article_id: int,
+    session: sqlite_service.SessionDep
+) -> Article:
+    article = session.get(Article, article_id)
+    if not article:
+        raise HTTPException(status_code=404, detail="Article not found")
+
+    service = LoadArticlesService()
+    service.load_article_content(article, session=session)
+    return article
