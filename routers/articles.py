@@ -4,12 +4,18 @@ from sqlmodel import select
 from models.article_model import Article
 from services import supabase_service
 from services.load_articles_service import LoadArticlesService
+from utils.dependencies import CurrentUser
 
 router = APIRouter()
 
 
 @router.post("/create")
-def create_article(article: Article, session: supabase_service.SessionDep) -> Article:
+def create_article(
+    current_user: CurrentUser,
+    article: Article,
+    session: supabase_service.SessionDep,
+) -> Article:
+    article.author_id = current_user.id
     session.add(article)
     session.commit()
     session.refresh(article)
@@ -18,11 +24,13 @@ def create_article(article: Article, session: supabase_service.SessionDep) -> Ar
 
 @router.put("/{article_id}/update")
 def update_article(
-    article_id: int, article_args: Article, session: supabase_service.SessionDep
+    current_user: CurrentUser,
+    article_id: int,
+    article_args: Article,
+    session: supabase_service.SessionDep,
 ) -> Article:
     article = session.get(Article, article_id)
-
-    if not article:
+    if not article or article.author_id != current_user.id:
         raise HTTPException(status_code=404, detail="Article not found")
 
     article.title = article_args.title
@@ -33,16 +41,27 @@ def update_article(
 
 
 @router.get("/")
-def get_articles(session: supabase_service.SessionDep) -> list[Article]:
-    articles = session.exec(select(Article).offset(0).limit(100)).all()
+def get_articles(
+    current_user: CurrentUser,
+    session: supabase_service.SessionDep,
+) -> list[Article]:
+    articles = session.exec(
+        select(Article)
+        .where(Article.author_id == current_user.id)
+        .offset(0)
+        .limit(100)
+    ).all()
     return articles
 
 
 @router.delete("/{article_id}/delete")
-def delete_article(article_id: int, session: supabase_service.SessionDep) -> None:
+def delete_article(
+    current_user: CurrentUser, article_id: int, session: supabase_service.SessionDep
+) -> None:
     article = session.get(Article, article_id)
-    if not article:
+    if not article or article.author_id != current_user.id:
         raise HTTPException(status_code=404, detail="Article not found")
+
     session.delete(article)
     session.commit()
     return Response(status_code=204)
@@ -51,7 +70,7 @@ def delete_article(article_id: int, session: supabase_service.SessionDep) -> Non
 @router.post("/load")
 async def load_articles(
     background_tasks: BackgroundTasks,
-    session: supabase_service.SessionDep
+    session: supabase_service.SessionDep,
 ):
     service = LoadArticlesService()
     background_tasks.add_task(service.load_latest, session=session)
@@ -61,7 +80,7 @@ async def load_articles(
 @router.post("/{article_id}/load_content")
 def load_article_content(
     article_id: int,
-    session: supabase_service.SessionDep
+    session: supabase_service.SessionDep,
 ) -> Article:
     article = session.get(Article, article_id)
     if not article:

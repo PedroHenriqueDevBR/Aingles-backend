@@ -9,3 +9,4 @@ class Card(SQLModel, table=True):
     appearsCount: int | None = Field(default=0)
     createdAt: datetime | None = Field(default=datetime.now())
     nextReviewAt: datetime | None = Field(default=datetime.now() + timedelta(days=1))
+    author_id: str | None = Field(default=None, index=True)
