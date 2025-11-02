@@ -1,12 +1,20 @@
+import os
 from fastapi import FastAPI
 from routers import core, articles, card, auth
 from services import supabase_service
+from dotenv import load_dotenv
 
+load_dotenv()
+
+debug = os.getenv("DEBUG", "false").lower() == "true"
 
 app = FastAPI(
     title="Aingles API",
     description="API com sistema de autenticação integrado ao Supabase",
     version="1.0.0",
+    docs_url=None if not debug else "/docs",
+    redoc_url=None if not debug else "/redoc",
+    openapi_url=None if not debug else "/openapi.json",
 )
 
 
