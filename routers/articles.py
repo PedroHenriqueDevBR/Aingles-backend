@@ -1,11 +1,16 @@
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Response
-from sqlmodel import select
+import logging
+
+from fastapi import APIRouter, HTTPException, Response
+from sqlmodel import Session, select
 
 from models.article_model import Article
 from services import supabase_service
 from services.load_articles_service import LoadArticlesService
+from services.supabase_service import engine
 from utils.dependencies import CurrentUser
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -46,10 +51,7 @@ def get_articles(
     session: supabase_service.SessionDep,
 ) -> list[Article]:
     articles = session.exec(
-        select(Article)
-        .where(Article.author_id == current_user.id)
-        .offset(0)
-        .limit(100)
+        select(Article).where(Article.author_id == current_user.id).offset(0).limit(100)
     ).all()
     return articles
 
@@ -67,14 +69,12 @@ def delete_article(
     return Response(status_code=204)
 
 
-@router.post("/load")
-async def load_articles(
-    background_tasks: BackgroundTasks,
-    session: supabase_service.SessionDep,
-):
-    service = LoadArticlesService()
-    background_tasks.add_task(service.load_latest, session=session)
-    return Response(status_code=200)
+async def load_articles():
+    logger.info("Loading latest articles...")
+    
+    with Session(engine) as session:
+        service = LoadArticlesService()
+        service.load_latest(session=session)
 
 
 @router.post("/{article_id}/load_content")

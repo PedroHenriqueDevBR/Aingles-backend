@@ -1,5 +1,6 @@
 annotated-types==0.7.0
 anyio==4.11.0
+APScheduler==3.11.1
 beautifulsoup4==4.14.2
 bs4==0.0.2
 certifi==2025.10.5
@@ -59,6 +60,7 @@ supabase-functions==2.23.0
 typer==0.19.2
 typing-inspection==0.4.2
 typing_extensions==4.15.0
+tzlocal==5.3.1
 urllib3==2.5.0
 uvicorn==0.37.0
 uvloop==0.21.0

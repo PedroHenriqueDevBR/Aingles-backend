@@ -1,12 +1,20 @@
 import os
-from fastapi import FastAPI
-from routers import core, articles, card, auth
-from services import supabase_service
+import logging
+
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
 from dotenv import load_dotenv
+from fastapi import FastAPI
+
+from routers import articles, auth, card, core
+from services import supabase_service
 
 load_dotenv()
 
 debug = os.getenv("DEBUG", "false").lower() == "true"
+scheduler = AsyncIOScheduler(timezone="America/Fortaleza")
+scheduler_hour = int(os.getenv("SCHEDULER_HOUR", "0"))
+scheduler_minute = int(os.getenv("SCHEDULER_MINUTE", "0"))
 
 app = FastAPI(
     title="Aingles API",
@@ -18,9 +26,23 @@ app = FastAPI(
 )
 
 
+@app.on_event("shutdown")
+async def stop_scheduler():
+    logging.info("Stopping scheduler...")
+    scheduler.shutdown(wait=False)
+
+
 @app.on_event("startup")
 def on_startup() -> None:
+    logging.info("Starting database and tables creation...")
     supabase_service.create_db_and_tables()
+
+    logging.info("Starting scheduler...")
+    scheduler.add_job(
+        func=articles.load_articles,
+        trigger=CronTrigger(hour=scheduler_hour, minute=scheduler_minute),
+    )
+    scheduler.start()
 
 
 # Public routes
