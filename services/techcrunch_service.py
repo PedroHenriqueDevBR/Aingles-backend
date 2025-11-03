@@ -40,6 +40,17 @@ class TechCrunchResponse:
             _owner_username,
             content=_content,
         )
+        
+    def to_json(self) -> dict:
+        return {
+            "category": self.category,
+            "title": self.title,
+            "url": self.url,
+            "slug": self.slug,
+            "published_at": self.published_at,
+            "owner_username": self.owner_username,
+            "content": self.content,
+        }
 
 
 class TechCrunchService:
@@ -110,8 +121,35 @@ class TechCrunchService:
 
         soup = BeautifulSoup(res.content, "html.parser")
         content_tag = soup.find("div", class_="entry-content")
-        content = content_tag.get_text(strip=True) if content_tag else "No Content"
-        return content
+        
+        if not content_tag:
+            return "No Content"
+        
+        markdown_content = []
+        
+        for element in content_tag.descendants:
+            if element.name == 'h1':
+                markdown_content.append(f"\n# {element.get_text(strip=True)}\n")
+            elif element.name == 'h2':
+                markdown_content.append(f"\n## {element.get_text(strip=True)}\n")
+            elif element.name == 'h3':
+                markdown_content.append(f"\n### {element.get_text(strip=True)}\n")
+            elif element.name == 'h4' or element.name == 'h5' or element.name == 'h6':
+                markdown_content.append(f"\n#### {element.get_text(strip=True)}\n")
+            elif element.name == 'p':
+                text = element.get_text(strip=True)
+                if text:
+                    markdown_content.append(f"{text}\n\n")
+            elif element.name == 'a' and element.get('href'):
+                markdown_content.append(f"[{element.get_text(strip=True)}]({element['href']})")
+            elif element.name == 'strong' or element.name == 'b':
+                markdown_content.append(f"**{element.get_text(strip=True)}**")
+            elif element.name == 'em' or element.name == 'i':
+                markdown_content.append(f"*{element.get_text(strip=True)}*")
+            elif element.name == 'li':
+                markdown_content.append(f"- {element.get_text(strip=True)}\n")
+        
+        return ''.join(markdown_content).strip()
 
 
 if __name__ == "__main__":
