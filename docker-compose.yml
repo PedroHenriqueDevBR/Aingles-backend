@@ -1,0 +1,26 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: ./dockerfiles/python/Dockerfile
+    command: uvicorn main:app --host 0.0.0.0 --port 8000
+    restart: always
+    expose:
+      - 8000
+    volumes:
+      - .:/code
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=1
+
+  nginx:
+    build:
+      context: .
+      dockerfile: ./dockerfiles/nginx/Dockerfile
+    restart: always
+    volumes:
+      - ./staticfiles/:/code/staticfiles
+      - ./mediafiles/:/code/mediafiles
+    ports:
+      - ${APP_PORT}:80
+    depends_on:
+      - web
