@@ -40,7 +40,7 @@ class TechCrunchResponse:
             _owner_username,
             content=_content,
         )
-        
+
     def to_json(self) -> dict:
         return {
             "category": self.category,
@@ -67,25 +67,25 @@ class TechCrunchService:
         soup = BeautifulSoup(res.content, "html.parser")
         cards = soup.find_all("div", class_="loop-card--post-type-post")
         response = []
-        
+
         for card in cards:
             # Title
             title_tag = card.find("a", class_="loop-card__title-link")
             title = title_tag.get_text(strip=True) if title_tag else "No Title"
-            
+
             # URL and Slug
             link_tag = card.find("a", class_="loop-card__title-link")
             url = (
                 link_tag["href"] if link_tag and "href" in link_tag.attrs else "No URL"
             )
             slug = url.split("/")[-2] if url != "No URL" else "No Slug"
-            
+
             # Category
             category_tag = card.find("a", class_="loop-card__cat")
             category = (
                 category_tag.get_text(strip=True) if category_tag else "No Category"
             )
-            
+
             # Published At
             published_at_tag = card.find("time", class_="loop-card__time")
             published_at = (
@@ -121,41 +121,43 @@ class TechCrunchService:
 
         soup = BeautifulSoup(res.content, "html.parser")
         content_tag = soup.find("div", class_="entry-content")
-        
+
         if not content_tag:
             return "No Content"
-        
+
         markdown_content = []
-        
+
         for element in content_tag.descendants:
-            if element.name == 'h1':
+            if element.name == "h1":
                 markdown_content.append(f"\n# {element.get_text(strip=True)}\n")
-            elif element.name == 'h2':
+            elif element.name == "h2":
                 markdown_content.append(f"\n## {element.get_text(strip=True)}\n")
-            elif element.name == 'h3':
+            elif element.name == "h3":
                 markdown_content.append(f"\n### {element.get_text(strip=True)}\n")
-            elif element.name == 'h4' or element.name == 'h5' or element.name == 'h6':
+            elif element.name == "h4" or element.name == "h5" or element.name == "h6":
                 markdown_content.append(f"\n#### {element.get_text(strip=True)}\n")
-            elif element.name == 'p':
+            elif element.name == "p":
                 text = element.get_text(strip=True)
                 if text:
                     markdown_content.append(f"{text}\n\n")
-            elif element.name == 'a' and element.get('href'):
-                markdown_content.append(f"[{element.get_text(strip=True)}]({element['href']})")
-            elif element.name == 'strong' or element.name == 'b':
+            elif element.name == "a" and element.get("href"):
+                markdown_content.append(
+                    f"[{element.get_text(strip=True)}]({element['href']})"
+                )
+            elif element.name == "strong" or element.name == "b":
                 markdown_content.append(f"**{element.get_text(strip=True)}**")
-            elif element.name == 'em' or element.name == 'i':
+            elif element.name == "em" or element.name == "i":
                 markdown_content.append(f"*{element.get_text(strip=True)}*")
-            elif element.name == 'li':
+            elif element.name == "li":
                 markdown_content.append(f"- {element.get_text(strip=True)}\n")
-        
-        return ''.join(markdown_content).strip()
+
+        return "".join(markdown_content).strip()
 
 
 if __name__ == "__main__":
     service = TechCrunchService()
     posts = service.latest_posts()
-    
+
     for post in posts:
         print(post.url)
 

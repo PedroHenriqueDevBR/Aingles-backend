@@ -3,43 +3,24 @@ import os
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-import jwt
-from jwt.exceptions import InvalidTokenError
+from jose import JWTError, jwt
+from sqlmodel import select
 
-from services.supabase_service import get_supabase_client
+from models.user_model import User
+from services.sqlite_service import get_session
 from schemas.auth_schema import UserResponse
 
 # Security scheme for JWT Bearer tokens
 security = HTTPBearer()
 
+# JWT Configuration
+SECRET_KEY = os.getenv("JWT_SECRET", "your-secret-key-change-this")
+ALGORITHM = "HS256"
+
 
 async def get_current_user(
     credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)],
 ) -> UserResponse:
-    """
-    Dependency to get the current authenticated user from JWT token.
-
-    This validates the JWT token from the Authorization header and returns
-    the user information. Use this dependency in protected routes.
-
-    Args:
-        credentials: HTTP Authorization credentials with Bearer token
-
-    Returns:
-        UserResponse: The authenticated user's information
-
-    Raises:
-        HTTPException 401: If token is invalid or expired
-
-    Example:
-        ```python
-        @router.get("/protected")
-        async def protected_route(
-            current_user: Annotated[UserResponse, Depends(get_current_user)]
-        ):
-            return {"message": f"Hello {current_user.email}"}
-        ```
-    """
     token = credentials.credentials
 
     credentials_exception = HTTPException(
@@ -49,19 +30,11 @@ async def get_current_user(
     )
 
     try:
-        jwt_secret = os.getenv("SUPABASE_JWT_SECRET")
-
-        if not jwt_secret:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="JWT secret not configured",
-            )
-
+        # Decode JWT token
         payload = jwt.decode(
             token,
-            jwt_secret,
-            algorithms=["HS256"],
-            audience="authenticated",
+            SECRET_KEY,
+            algorithms=[ALGORITHM],
         )
 
         user_id: str = payload.get("sub")
@@ -70,35 +43,27 @@ async def get_current_user(
         if user_id is None or email is None:
             raise credentials_exception
 
-        supabase = get_supabase_client()
+        # Get user from database
+        session = next(get_session())
+        user = session.exec(select(User).where(User.id == int(user_id))).first()
 
-        try:
-            user_response = supabase.auth.get_user(token)
+        if not user:
+            raise credentials_exception
 
-            if not user_response.user:
-                raise credentials_exception
+        # Build user response
+        user_response = UserResponse(
+            id=user.id,
+            email=user.email,
+            username=user.username,
+            created_at=user.created_at,
+            last_sign_in_at=user.last_sign_in_at,
+            email_confirmed_at=user.email_confirmed_at,
+        )
 
-            # Build user response
-            user = UserResponse(
-                id=user_response.user.id,
-                email=user_response.user.email or email,
-                username=user_response.user.user_metadata.get("username"),
-                created_at=user_response.user.created_at,
-                last_sign_in_at=user_response.user.last_sign_in_at,
-                email_confirmed_at=user_response.user.email_confirmed_at,
-            )
+        session.close()
+        return user_response
 
-            return user
-
-        except Exception as e:
-            # If Supabase call fails, return basic user info from JWT
-            return UserResponse(
-                id=user_id,
-                email=email,
-                username=payload.get("user_metadata", {}).get("username"),
-            )
-
-    except InvalidTokenError:
+    except JWTError:
         raise credentials_exception
     except Exception as e:
         raise HTTPException(
@@ -111,21 +76,6 @@ async def get_current_user(
 async def get_current_active_user(
     current_user: Annotated[UserResponse, Depends(get_current_user)],
 ) -> UserResponse:
-    """
-    Dependency to get the current active user.
-
-    Validates that the user's email is confirmed.
-    Use this for routes that require email verification.
-
-    Args:
-        current_user: The current authenticated user
-
-    Returns:
-        UserResponse: The authenticated and verified user
-
-    Raises:
-        HTTPException 403: If user's email is not confirmed
-    """
     if not current_user.email_confirmed_at:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

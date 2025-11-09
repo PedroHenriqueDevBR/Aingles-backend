@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 
 from routers import articles, auth, card, core
-from services import supabase_service
+from services import sqlite_service
 
 load_dotenv()
 
@@ -18,7 +18,7 @@ scheduler_minute = int(os.getenv("SCHEDULER_MINUTE", "0"))
 
 app = FastAPI(
     title="Aingles API",
-    description="API com sistema de autenticação integrado ao Supabase",
+    description="API com sistema de autenticação JWT e banco de dados SQLite",
     version="1.0.0",
     docs_url=None if not debug else "/docs",
     redoc_url=None if not debug else "/redoc",
@@ -35,7 +35,7 @@ async def stop_scheduler():
 @app.on_event("startup")
 def on_startup() -> None:
     logging.info("Starting database and tables creation...")
-    supabase_service.create_db_and_tables()
+    sqlite_service.create_db_and_tables()
 
     logging.info("Starting scheduler...")
     scheduler.add_job(

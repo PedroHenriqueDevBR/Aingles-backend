@@ -15,3 +15,5 @@ class User(SQLModel, table=True):
     is_superuser: bool = Field(default=False)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: Optional[datetime] = Field(default=None)
+    last_sign_in_at: Optional[datetime] = Field(default=None)
+    email_confirmed_at: Optional[datetime] = Field(default=None)

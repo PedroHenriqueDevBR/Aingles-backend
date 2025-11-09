@@ -1,8 +1,13 @@
-from datetime import datetime
+import os
+from datetime import datetime, timedelta
+from typing import Optional
 
 from fastapi import HTTPException, status
-from supabase_auth.errors import AuthApiError
+from passlib.context import CryptContext
+from jose import JWTError, jwt
+from sqlmodel import select
 
+from models.user_model import User
 from schemas.auth_schema import (
     AuthResponse,
     SignInRequest,
@@ -10,77 +15,122 @@ from schemas.auth_schema import (
     TokenResponse,
     UserResponse,
 )
-from services.supabase_service import get_supabase_client
+from services.sqlite_service import get_session
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+SECRET_KEY = os.getenv("JWT_SECRET", "your-secret-key-change-this")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
+REFRESH_TOKEN_EXPIRE_DAYS = 30  # 30 days
 
 
 class AuthService:
-    """
-    Service layer for handling Supabase Authentication operations.
-    Handles sign up, sign in, sign out, token refresh, and user retrieval.
-    """
+    @staticmethod
+    def verify_password(plain_password: str, hashed_password: str) -> bool:
+        return pwd_context.verify(plain_password, hashed_password)
 
-    def __init__(self):
-        self.supabase = get_supabase_client()
+    @staticmethod
+    def get_password_hash(password: str) -> str:
+        return pwd_context.hash(password)
+
+    @staticmethod
+    def create_access_token(
+        data: dict, expires_delta: Optional[timedelta] = None
+    ) -> str:
+        to_encode = data.copy()
+        if expires_delta:
+            expire = datetime.utcnow() + expires_delta
+        else:
+            expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        to_encode.update({"exp": expire, "type": "access"})
+        encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+        return encoded_jwt
+
+    @staticmethod
+    def create_refresh_token(
+        data: dict, expires_delta: Optional[timedelta] = None
+    ) -> str:
+        to_encode = data.copy()
+        if expires_delta:
+            expire = datetime.utcnow() + expires_delta
+        else:
+            expire = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+        to_encode.update({"exp": expire, "type": "refresh"})
+        encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+        return encoded_jwt
 
     async def sign_up(self, request: SignUpRequest) -> AuthResponse:
-        """
-        Register a new user with email and password.
-        Supabase will send a confirmation email automatically if enabled.
-
-        Args:
-            request: SignUpRequest with email, password, and username
-
-        Returns:
-            AuthResponse with user data and session tokens
-
-        Raises:
-            HTTPException: If registration fails
-        """
         try:
-            # Sign up with Supabase Auth
-            response = self.supabase.auth.sign_up(
-                {
-                    "email": request.email,
-                    "password": request.password,
-                    "options": {
-                        "data": {
-                            "username": request.username,
-                        }
-                    },
-                }
-            )
+            session = next(get_session())
 
-            if not response.user:
+            # Check if email already exists
+            existing_user = session.exec(
+                select(User).where(User.email == request.email)
+            ).first()
+            if existing_user:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Failed to create user account",
+                    detail="Email already registered",
                 )
+
+            # Check if username already exists
+            existing_username = session.exec(
+                select(User).where(User.username == request.username)
+            ).first()
+            if existing_username:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Username already taken",
+                )
+
+            # Create new user
+            hashed_password = self.get_password_hash(request.password)
+            new_user = User(
+                email=request.email,
+                username=request.username,
+                hashed_password=hashed_password,
+                created_at=datetime.utcnow(),
+                email_confirmed_at=datetime.utcnow(),  # Auto-confirm for SQLite
+            )
+
+            session.add(new_user)
+            session.commit()
+            session.refresh(new_user)
+
+            # Create tokens
+            access_token = self.create_access_token(
+                data={"sub": str(new_user.id), "email": new_user.email}
+            )
+            refresh_token = self.create_refresh_token(
+                data={"sub": str(new_user.id), "email": new_user.email}
+            )
 
             user_data = UserResponse(
-                id=response.user.id,
-                email=response.user.email or request.email,
-                username=request.username,
-                created_at=response.user.created_at,
-                email_confirmed_at=response.user.email_confirmed_at,
+                id=new_user.id,
+                email=new_user.email,
+                username=new_user.username,
+                created_at=new_user.created_at,
+                email_confirmed_at=new_user.email_confirmed_at,
             )
 
-            session_data = None
-            if response.session:
-                session_data = TokenResponse(
-                    access_token=response.session.access_token,
-                    refresh_token=response.session.refresh_token or "",
-                    token_type="bearer",
-                    expires_in=response.session.expires_in or 3600,
-                    expires_at=response.session.expires_at,
-                )
+            session_data = TokenResponse(
+                access_token=access_token,
+                refresh_token=refresh_token,
+                token_type="bearer",
+                expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+                expires_at=int(
+                    (
+                        datetime.utcnow()
+                        + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+                    ).timestamp()
+                ),
+            )
 
+            session.close()
             return AuthResponse(user=user_data, session=session_data)
 
-        except AuthApiError as e:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Authentication error: {str(e)}",
-            )
+        except HTTPException:
+            raise
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -88,56 +138,67 @@ class AuthService:
             )
 
     async def sign_in(self, request: SignInRequest) -> AuthResponse:
-        """
-        Authenticate user with email and password.
-
-        Args:
-            request: SignInRequest with email and password
-
-        Returns:
-            AuthResponse with user data and session tokens
-
-        Raises:
-            HTTPException: If authentication fails
-        """
         try:
-            # Sign in with Supabase Auth
-            response = self.supabase.auth.sign_in_with_password(
-                {"email": request.email, "password": request.password}
-            )
+            session = next(get_session())
 
-            if not response.user or not response.session:
+            # Find user by email
+            user = session.exec(select(User).where(User.email == request.email)).first()
+
+            if not user or not self.verify_password(
+                request.password, user.hashed_password
+            ):
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Invalid credentials",
                 )
 
-            # Build user response
+            if not user.is_active:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="User account is inactive",
+                )
+
+            # Update last sign in
+            user.last_sign_in_at = datetime.utcnow()
+            session.add(user)
+            session.commit()
+            session.refresh(user)
+
+            # Create tokens
+            access_token = self.create_access_token(
+                data={"sub": str(user.id), "email": user.email}
+            )
+            refresh_token = self.create_refresh_token(
+                data={"sub": str(user.id), "email": user.email}
+            )
+
             user_data = UserResponse(
-                id=response.user.id,
-                email=response.user.email or request.email,
-                username=response.user.user_metadata.get("username"),
-                created_at=response.user.created_at,
-                last_sign_in_at=response.user.last_sign_in_at,
-                email_confirmed_at=response.user.email_confirmed_at,
+                id=user.id,
+                email=user.email,
+                username=user.username,
+                created_at=user.created_at,
+                last_sign_in_at=user.last_sign_in_at,
+                email_confirmed_at=user.email_confirmed_at,
             )
 
-            # Build session response
             session_data = TokenResponse(
-                access_token=response.session.access_token,
-                refresh_token=response.session.refresh_token or "",
+                access_token=access_token,
+                refresh_token=refresh_token,
                 token_type="bearer",
-                expires_in=response.session.expires_in or 3600,
-                expires_at=response.session.expires_at,
+                expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+                expires_at=int(
+                    (
+                        datetime.utcnow()
+                        + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+                    ).timestamp()
+                ),
             )
 
+            session.close()
             return AuthResponse(user=user_data, session=session_data)
 
-        except AuthApiError as e:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=f"Authentication failed: {str(e)}",
-            )
+        except HTTPException:
+            raise
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -145,24 +206,16 @@ class AuthService:
             )
 
     async def sign_out(self, access_token: str) -> None:
-        """
-        Sign out the current user and invalidate their session.
-
-        Args:
-            access_token: The user's access token
-
-        Raises:
-            HTTPException: If sign out fails
-        """
         try:
-            # Set the session before signing out
-            self.supabase.auth.set_session(access_token, "")
-            self.supabase.auth.sign_out()
-
-        except AuthApiError as e:
+            # Validate token
+            payload = jwt.decode(access_token, SECRET_KEY, algorithms=[ALGORITHM])
+            # Token is valid, sign out is successful
+            # In a production environment, you might want to maintain a token blacklist
+            pass
+        except JWTError:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Sign out failed: {str(e)}",
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or expired token",
             )
         except Exception as e:
             raise HTTPException(
@@ -171,60 +224,46 @@ class AuthService:
             )
 
     async def get_user(self, access_token: str) -> UserResponse:
-        """
-        Get the current user's information from their access token.
-
-        Args:
-            access_token: The user's access token
-
-        Returns:
-            UserResponse with user data
-
-        Raises:
-            HTTPException: If user retrieval fails
-        """
         try:
-            # Get user from token
-            response = self.supabase.auth.get_user(access_token)
+            # Decode token
+            payload = jwt.decode(access_token, SECRET_KEY, algorithms=[ALGORITHM])
+            user_id: str = payload.get("sub")
 
-            if not response.user:
+            if user_id is None:
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Invalid or expired token",
                 )
 
+            session = next(get_session())
+
+            # Get user from database
+            user = session.exec(select(User).where(User.id == int(user_id))).first()
+
+            if not user:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="User not found",
+                )
+
+            session.close()
+
             return UserResponse(
-                id=response.user.id,
-                email=response.user.email or "",
-                username=response.user.user_metadata.get("username"),
-                created_at=(
-                    datetime.fromisoformat(
-                        response.user.created_at.replace("Z", "+00:00")
-                    )
-                    if response.user.created_at
-                    else None
-                ),
-                last_sign_in_at=(
-                    datetime.fromisoformat(
-                        response.user.last_sign_in_at.replace("Z", "+00:00")
-                    )
-                    if response.user.last_sign_in_at
-                    else None
-                ),
-                email_confirmed_at=(
-                    datetime.fromisoformat(
-                        response.user.email_confirmed_at.replace("Z", "+00:00")
-                    )
-                    if response.user.email_confirmed_at
-                    else None
-                ),
+                id=user.id,
+                email=user.email,
+                username=user.username,
+                created_at=user.created_at,
+                last_sign_in_at=user.last_sign_in_at,
+                email_confirmed_at=user.email_confirmed_at,
             )
 
-        except AuthApiError as e:
+        except JWTError:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=f"Failed to get user: {str(e)}",
+                detail="Invalid or expired token",
             )
+        except HTTPException:
+            raise
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -232,41 +271,59 @@ class AuthService:
             )
 
     async def refresh_token(self, refresh_token: str) -> TokenResponse:
-        """
-        Refresh the user's access token using their refresh token.
-
-        Args:
-            refresh_token: The user's refresh token
-
-        Returns:
-            TokenResponse with new access and refresh tokens
-
-        Raises:
-            HTTPException: If token refresh fails
-        """
         try:
-            # Refresh session
-            response = self.supabase.auth.refresh_session(refresh_token)
+            # Decode refresh token
+            payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
+            user_id: str = payload.get("sub")
+            token_type: str = payload.get("type")
 
-            if not response.session:
+            if user_id is None or token_type != "refresh":
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Failed to refresh token",
+                    detail="Invalid refresh token",
                 )
 
-            return TokenResponse(
-                access_token=response.session.access_token,
-                refresh_token=response.session.refresh_token or "",
-                token_type="bearer",
-                expires_in=response.session.expires_in or 3600,
-                expires_at=response.session.expires_at,
+            session = next(get_session())
+
+            # Verify user exists
+            user = session.exec(select(User).where(User.id == int(user_id))).first()
+
+            if not user:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="User not found",
+                )
+
+            session.close()
+
+            # Create new tokens
+            access_token = self.create_access_token(
+                data={"sub": str(user.id), "email": user.email}
+            )
+            new_refresh_token = self.create_refresh_token(
+                data={"sub": str(user.id), "email": user.email}
             )
 
-        except AuthApiError as e:
+            return TokenResponse(
+                access_token=access_token,
+                refresh_token=new_refresh_token,
+                token_type="bearer",
+                expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+                expires_at=int(
+                    (
+                        datetime.utcnow()
+                        + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+                    ).timestamp()
+                ),
+            )
+
+        except JWTError:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=f"Token refresh failed: {str(e)}",
+                detail="Invalid or expired refresh token",
             )
+        except HTTPException:
+            raise
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

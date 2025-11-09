@@ -4,9 +4,9 @@ from fastapi import APIRouter, HTTPException, Response
 from sqlmodel import Session, select
 
 from models.article_model import Article
-from services import supabase_service
+from services import sqlite_service
 from services.load_articles_service import LoadArticlesService
-from services.supabase_service import engine
+from services.sqlite_service import engine
 from utils.dependencies import CurrentUser
 
 logging.basicConfig(level=logging.INFO)
@@ -18,7 +18,7 @@ router = APIRouter()
 def create_article(
     current_user: CurrentUser,
     article: Article,
-    session: supabase_service.SessionDep,
+    session: sqlite_service.SessionDep,
 ) -> Article:
     article.author_id = current_user.id
     session.add(article)
@@ -32,7 +32,7 @@ def update_article(
     current_user: CurrentUser,
     article_id: int,
     article_args: Article,
-    session: supabase_service.SessionDep,
+    session: sqlite_service.SessionDep,
 ) -> Article:
     article = session.get(Article, article_id)
     if not article or article.author_id != current_user.id:
@@ -48,7 +48,7 @@ def update_article(
 @router.get("/")
 def get_articles(
     current_user: CurrentUser,
-    session: supabase_service.SessionDep,
+    session: sqlite_service.SessionDep,
 ) -> list[Article]:
     articles = session.exec(
         select(Article)
@@ -61,7 +61,7 @@ def get_articles(
 
 @router.delete("/{article_id}/delete")
 def delete_article(
-    current_user: CurrentUser, article_id: int, session: supabase_service.SessionDep
+    current_user: CurrentUser, article_id: int, session: sqlite_service.SessionDep
 ) -> None:
     article = session.get(Article, article_id)
     if not article or article.author_id != current_user.id:
@@ -84,7 +84,7 @@ async def load_articles():
 def load_article_content(
     current_user: CurrentUser,
     article_id: int,
-    session: supabase_service.SessionDep,
+    session: sqlite_service.SessionDep,
 ) -> Article:
     article = session.get(Article, article_id)
     if not article:

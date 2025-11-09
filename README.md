@@ -2,11 +2,9 @@
 
 Backend do aplicativo Aingles, facilita a sincronização da aplicação entre diferentes plataformas.
 
-## 🔐 Autenticação com Supabase
+## 🔐 Autenticação JWT
 
-Este projeto está integrado com **Supabase Authentication** usando o provedor de e-mail.
-
-Para informações completas sobre autenticação, configuração e uso, consulte a [documentação de autenticação](./AUTHENTICATION.md).
+Este projeto implementa autenticação JWT (JSON Web Tokens) com banco de dados SQLite local.
 
 ### Configuração Rápida
 
@@ -18,7 +16,7 @@ pip install -r requirements.txt
 2. Configure as variáveis de ambiente:
 ```bash
 cp .env.example .env
-# Edite o .env com suas credenciais do Supabase
+# Edite o .env com sua chave secreta JWT
 ```
 
 3. Execute o servidor:
@@ -50,24 +48,23 @@ Após iniciar o servidor, acesse:
 ## 🛠️ Tecnologias
 
 - **FastAPI** - Framework web
-- **Supabase** - Autenticação e banco de dados
+- **SQLite** - Banco de dados local
 - **SQLModel** - ORM
-- **PostgreSQL** - Banco de dados
+- **python-jose** - Criação e validação de tokens JWT
+- **passlib** - Hash de senhas com bcrypt
 - **PyJWT** - Validação de tokens JWT
 
-## 📖 Supabase keys
+## 📖 Configuração de Autenticação
 
-## INSTRUCTIONS FOR SUPABASE AUTHENTICATION SETUP
+1. Gere uma chave secreta segura:
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(32))"
+```
 
-1. Go to https://app.supabase.com and select your project
-2. Navigate to Project Settings > API
-3. Copy the following values:
-   - URL: Your project URL
-   - anon/public key: Your anon key
-   - JWT Secret: Your JWT secret (in JWT Settings section)
-4. Enable Email Authentication:
-   - Go to Authentication > Providers
-   - Enable "Email" provider
-   - Configure email templates if desired
-5. Copy this file to .env and replace the placeholder values
-6. Never commit the .env file to version control
+2. Configure a variável de ambiente `JWT_SECRET` no arquivo `.env`:
+```
+JWT_SECRET=sua-chave-secreta-gerada-aqui
+```
+
+3. O banco de dados SQLite será criado automaticamente na primeira execução
+4. Nunca commite o arquivo `.env` no controle de versão

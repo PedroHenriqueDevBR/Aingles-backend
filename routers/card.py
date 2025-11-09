@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Response
 from sqlmodel import select
 
 from models.card_models import Card
-from services import supabase_service
+from services import sqlite_service
 from utils.dependencies import CurrentUser
 
 router = APIRouter()
@@ -11,7 +11,7 @@ router = APIRouter()
 @router.get("/")
 def get_all_cards(
     current_user: CurrentUser,
-    session: supabase_service.SessionDep,
+    session: sqlite_service.SessionDep,
 ) -> list[Card]:
 
     cards = session.exec(
@@ -24,7 +24,7 @@ def get_all_cards(
 def get_card(
     current_user: CurrentUser,
     card_id: int,
-    session: supabase_service.SessionDep,
+    session: sqlite_service.SessionDep,
 ) -> Card:
     card = session.get(Card, card_id)
     if not card or card.author_id != current_user.id:
@@ -37,7 +37,7 @@ def get_card(
 def create_card(
     current_user: CurrentUser,
     card: Card,
-    session: supabase_service.SessionDep,
+    session: sqlite_service.SessionDep,
 ) -> Card:
     card.author_id = current_user.id
     session.add(card)
@@ -50,7 +50,7 @@ def create_card(
 def create_all_cards(
     current_user: CurrentUser,
     cards: list[Card],
-    session: supabase_service.SessionDep,
+    session: sqlite_service.SessionDep,
 ) -> list[Card]:
     for card in cards:
         card.author_id = current_user.id
@@ -68,7 +68,7 @@ def update_card(
     current_user: CurrentUser,
     card_id: int,
     card_arg: Card,
-    session: supabase_service.SessionDep,
+    session: sqlite_service.SessionDep,
 ) -> Card:
     card = session.get(Card, card_id)
     if not card or card.author_id != current_user.id:
@@ -89,7 +89,7 @@ def update_card(
 def delete_card(
     current_user: CurrentUser,
     card_id: int,
-    session: supabase_service.SessionDep,
+    session: sqlite_service.SessionDep,
 ):
     card = session.get(Card, card_id)
     if not card or card.author_id != current_user.id:

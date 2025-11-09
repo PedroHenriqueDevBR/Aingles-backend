@@ -4,7 +4,7 @@ from sqlmodel import select
 
 from models.article_model import Article
 from services.onesignal_service import send_notification
-from services.supabase_service import SessionDep
+from services.sqlite_service import SessionDep
 from services.techcrunch_service import TechCrunchResponse, TechCrunchService
 
 logging.basicConfig(level=logging.INFO)

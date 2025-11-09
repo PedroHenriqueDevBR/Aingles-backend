@@ -42,7 +42,7 @@ class TokenResponse(BaseModel):
 
 
 class UserResponse(BaseModel):
-    id: str
+    id: int
     email: str
     username: Optional[str] = None
     created_at: Optional[datetime] = None
@@ -52,7 +52,7 @@ class UserResponse(BaseModel):
     class Config:
         json_schema_extra = {
             "example": {
-                "id": "123e4567-e89b-12d3-a456-426614174000",
+                "id": 1,
                 "email": "user@example.com",
                 "username": "johndoe",
                 "created_at": "2024-01-01T00:00:00Z",
@@ -70,7 +70,7 @@ class AuthResponse(BaseModel):
         json_schema_extra = {
             "example": {
                 "user": {
-                    "id": "123e4567-e89b-12d3-a456-426614174000",
+                    "id": 1,
                     "email": "user@example.com",
                     "username": "johndoe",
                 },
