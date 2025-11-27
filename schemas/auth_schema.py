@@ -20,12 +20,12 @@ class SignUpRequest(BaseModel):
 
 
 class SignInRequest(BaseModel):
-    email: EmailStr
+    username: str
     password: str
 
     class Config:
         json_schema_extra = {
-            "example": {"email": "user@example.com", "password": "strongPassword123!"}
+            "example": {"username": "johndoe", "password": "strongPassword123!"}
         }
 
 
@@ -42,22 +42,16 @@ class TokenResponse(BaseModel):
 
 
 class UserResponse(BaseModel):
-    id: int
+    id: str
     email: str
     username: Optional[str] = None
-    created_at: Optional[datetime] = None
-    last_sign_in_at: Optional[datetime] = None
-    email_confirmed_at: Optional[datetime] = None
 
     class Config:
         json_schema_extra = {
             "example": {
-                "id": 1,
+                "id": "550e8400-e29b-41d4-a716-446655440000",
                 "email": "user@example.com",
                 "username": "johndoe",
-                "created_at": "2024-01-01T00:00:00Z",
-                "last_sign_in_at": "2024-01-15T10:30:00Z",
-                "email_confirmed_at": "2024-01-01T00:05:00Z",
             }
         }
 
@@ -70,7 +64,7 @@ class AuthResponse(BaseModel):
         json_schema_extra = {
             "example": {
                 "user": {
-                    "id": 1,
+                    "id": "550e8400-e29b-41d4-a716-446655440000",
                     "email": "user@example.com",
                     "username": "johndoe",
                 },

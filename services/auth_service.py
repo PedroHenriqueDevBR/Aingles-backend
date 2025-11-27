@@ -3,8 +3,8 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 from fastapi import HTTPException, status
-from passlib.context import CryptContext
 from jose import JWTError, jwt
+from passlib.context import CryptContext
 from sqlmodel import select
 
 from models.user_model import User
@@ -63,7 +63,6 @@ class AuthService:
         try:
             session = next(get_session())
 
-            # Check if email already exists
             existing_user = session.exec(
                 select(User).where(User.email == request.email)
             ).first()
@@ -73,7 +72,6 @@ class AuthService:
                     detail="Email already registered",
                 )
 
-            # Check if username already exists
             existing_username = session.exec(
                 select(User).where(User.username == request.username)
             ).first()
@@ -83,7 +81,6 @@ class AuthService:
                     detail="Username already taken",
                 )
 
-            # Create new user
             hashed_password = self.get_password_hash(request.password)
             new_user = User(
                 email=request.email,
@@ -97,12 +94,19 @@ class AuthService:
             session.commit()
             session.refresh(new_user)
 
-            # Create tokens
             access_token = self.create_access_token(
-                data={"sub": str(new_user.id), "email": new_user.email}
+                data={
+                    "sub": new_user.id,
+                    "email": new_user.email,
+                    "username": new_user.username,
+                }
             )
             refresh_token = self.create_refresh_token(
-                data={"sub": str(new_user.id), "email": new_user.email}
+                data={
+                    "sub": new_user.id,
+                    "email": new_user.email,
+                    "username": new_user.username,
+                }
             )
 
             user_data = UserResponse(
@@ -135,17 +139,19 @@ class AuthService:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"An error occurred during sign up: {str(e)}",
-            )
+            ) from e
 
     async def sign_in(self, request: SignInRequest) -> AuthResponse:
         try:
             session = next(get_session())
 
-            # Find user by email
-            user = session.exec(select(User).where(User.email == request.email)).first()
+            user = session.exec(
+                select(User).where(User.username == request.username)
+            ).first()
 
             if not user or not self.verify_password(
-                request.password, user.hashed_password
+                request.password,
+                user.hashed_password,
             ):
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
@@ -158,27 +164,30 @@ class AuthService:
                     detail="User account is inactive",
                 )
 
-            # Update last sign in
             user.last_sign_in_at = datetime.utcnow()
             session.add(user)
             session.commit()
             session.refresh(user)
 
-            # Create tokens
             access_token = self.create_access_token(
-                data={"sub": str(user.id), "email": user.email}
+                data={
+                    "sub": str(user.id),
+                    "email": user.email,
+                    "username": user.username,
+                }
             )
             refresh_token = self.create_refresh_token(
-                data={"sub": str(user.id), "email": user.email}
+                data={
+                    "sub": str(user.id),
+                    "email": user.email,
+                    "username": user.username,
+                }
             )
 
             user_data = UserResponse(
                 id=user.id,
                 email=user.email,
                 username=user.username,
-                created_at=user.created_at,
-                last_sign_in_at=user.last_sign_in_at,
-                email_confirmed_at=user.email_confirmed_at,
             )
 
             session_data = TokenResponse(
@@ -203,29 +212,24 @@ class AuthService:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"An error occurred during sign in: {str(e)}",
-            )
+            ) from e
 
     async def sign_out(self, access_token: str) -> None:
         try:
-            # Validate token
-            payload = jwt.decode(access_token, SECRET_KEY, algorithms=[ALGORITHM])
-            # Token is valid, sign out is successful
-            # In a production environment, you might want to maintain a token blacklist
-            pass
-        except JWTError:
+            jwt.decode(access_token, SECRET_KEY, algorithms=[ALGORITHM])
+        except JWTError as exc:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid or expired token",
-            )
+            ) from exc
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"An error occurred during sign out: {str(e)}",
-            )
+            ) from e
 
     async def get_user(self, access_token: str) -> UserResponse:
         try:
-            # Decode token
             payload = jwt.decode(access_token, SECRET_KEY, algorithms=[ALGORITHM])
             user_id: str = payload.get("sub")
 
@@ -236,8 +240,6 @@ class AuthService:
                 )
 
             session = next(get_session())
-
-            # Get user from database
             user = session.exec(select(User).where(User.id == int(user_id))).first()
 
             if not user:
@@ -257,22 +259,21 @@ class AuthService:
                 email_confirmed_at=user.email_confirmed_at,
             )
 
-        except JWTError:
+        except JWTError as err:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid or expired token",
-            )
+            ) from err
         except HTTPException:
             raise
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"An error occurred while getting user: {str(e)}",
-            )
+            ) from e
 
     async def refresh_token(self, refresh_token: str) -> TokenResponse:
         try:
-            # Decode refresh token
             payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
             user_id: str = payload.get("sub")
             token_type: str = payload.get("type")
@@ -284,8 +285,6 @@ class AuthService:
                 )
 
             session = next(get_session())
-
-            # Verify user exists
             user = session.exec(select(User).where(User.id == int(user_id))).first()
 
             if not user:
@@ -296,12 +295,17 @@ class AuthService:
 
             session.close()
 
-            # Create new tokens
             access_token = self.create_access_token(
-                data={"sub": str(user.id), "email": user.email}
+                data={
+                    "sub": str(user.id),
+                    "email": user.email,
+                }
             )
             new_refresh_token = self.create_refresh_token(
-                data={"sub": str(user.id), "email": user.email}
+                data={
+                    "sub": str(user.id),
+                    "email": user.email,
+                }
             )
 
             return TokenResponse(
@@ -317,18 +321,18 @@ class AuthService:
                 ),
             )
 
-        except JWTError:
+        except JWTError as err:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid or expired refresh token",
-            )
+            ) from err
         except HTTPException:
             raise
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"An error occurred during token refresh: {str(e)}",
-            )
+            ) from e
 
 
 # Singleton instance

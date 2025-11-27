@@ -1,5 +1,6 @@
 from typing import Annotated
 import os
+from uuid import UUID
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -30,47 +31,37 @@ async def get_current_user(
     )
 
     try:
-        # Decode JWT token
-        payload = jwt.decode(
-            token,
-            SECRET_KEY,
-            algorithms=[ALGORITHM],
-        )
-
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id: str = payload.get("sub")
         email: str = payload.get("email")
+        username: str = payload.get("username")
 
-        if user_id is None or email is None:
+        if user_id is None or email is None or username is None:
             raise credentials_exception
 
-        # Get user from database
         session = next(get_session())
-        user = session.exec(select(User).where(User.id == int(user_id))).first()
+        user = session.exec(select(User).where(User.id == UUID(user_id))).first()
 
         if not user:
             raise credentials_exception
 
-        # Build user response
         user_response = UserResponse(
-            id=user.id,
+            id=str(user.id),
             email=user.email,
             username=user.username,
-            created_at=user.created_at,
-            last_sign_in_at=user.last_sign_in_at,
-            email_confirmed_at=user.email_confirmed_at,
         )
 
         session.close()
         return user_response
 
-    except JWTError:
-        raise credentials_exception
+    except JWTError as err:
+        raise credentials_exception from err
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Authentication error: {str(e)}",
             headers={"WWW-Authenticate": "Bearer"},
-        )
+        ) from e
 
 
 async def get_current_active_user(
