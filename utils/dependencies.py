@@ -46,9 +46,10 @@ async def get_current_user(
             raise credentials_exception
 
         user_response = UserResponse(
-            id=str(user.id),
+            id=user.id,
             email=user.email,
             username=user.username,
+            name=user.name or "",
         )
 
         session.close()

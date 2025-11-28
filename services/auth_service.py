@@ -85,6 +85,7 @@ class AuthService:
             new_user = User(
                 email=request.email,
                 username=request.username,
+                name=request.name,
                 hashed_password=hashed_password,
                 created_at=datetime.utcnow(),
                 email_confirmed_at=datetime.utcnow(),  # Auto-confirm for SQLite
@@ -96,14 +97,14 @@ class AuthService:
 
             access_token = self.create_access_token(
                 data={
-                    "sub": new_user.id,
+                    "sub": str(new_user.id),
                     "email": new_user.email,
                     "username": new_user.username,
                 }
             )
             refresh_token = self.create_refresh_token(
                 data={
-                    "sub": new_user.id,
+                    "sub": str(new_user.id),
                     "email": new_user.email,
                     "username": new_user.username,
                 }
@@ -113,8 +114,7 @@ class AuthService:
                 id=new_user.id,
                 email=new_user.email,
                 username=new_user.username,
-                created_at=new_user.created_at,
-                email_confirmed_at=new_user.email_confirmed_at,
+                name=new_user.name,
             )
 
             session_data = TokenResponse(

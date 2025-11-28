@@ -1,4 +1,4 @@
-import uuid
+from uuid import UUID, uuid4
 from datetime import datetime
 from typing import Optional
 
@@ -8,7 +8,7 @@ from sqlmodel import Field, SQLModel
 class User(SQLModel, table=True):
     __tablename__ = "user"
 
-    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True, index=True)
+    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
     email: str = Field(unique=True, index=True, nullable=False)
     username: str = Field(unique=True, index=True, nullable=False)
     name: Optional[str] = Field(default=None, index=True)

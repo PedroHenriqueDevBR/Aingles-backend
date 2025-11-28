@@ -38,6 +38,7 @@ async def sign_up(request: SignUpRequest) -> AuthResponse:
     - **email**: Valid email address (will receive confirmation email)
     - **password**: Strong password (minimum 6 characters recommended)
     - **username**: Unique username for the user
+    - **name**: Optional full name of the user
 
     Returns user information and authentication tokens.
     """

@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException, Response
 from sqlmodel import select
 
 from models.card_models import Card, CardReviewLog
-from schemas.card_schema import CardResponse, CardReviewUpdate
+from schemas.card_schema import CardResponse, CardReviewUpdate, CardUpdateRequest
 from services import sqlite_service
 from utils.dependencies import CurrentUser
 from sqlalchemy.orm import selectinload
@@ -15,7 +15,7 @@ router = APIRouter()
 def get_all_cards(
     current_user: CurrentUser,
     session: sqlite_service.SessionDep,
-) -> list[CardResponse]:
+) -> list[Card]:
     cards = session.exec(
         select(Card)
         .filter(Card.author_id == current_user.id)
@@ -29,10 +29,10 @@ def get_all_cards(
 @router.get("/{card_id}")
 def get_card(
     current_user: CurrentUser,
-    card_id: int,
+    card_id: str,
     session: sqlite_service.SessionDep,
-) -> Card:
-    card = session.get(Card, card_id)
+) -> CardResponse:
+    card = session.get(Card, UUID(card_id))
     if not card or card.author_id != current_user.id:
         return HTTPException(status_code=404, detail="Card not found!")
 
@@ -72,19 +72,21 @@ def create_all_cards(
 @router.put("/{card_id}/update")
 def update_card(
     current_user: CurrentUser,
-    card_id: int,
-    card_arg: Card,
+    card_id: str,
+    card_arg: CardUpdateRequest,
     session: sqlite_service.SessionDep,
-) -> Card:
-    card = session.get(Card, card_id)
+) -> CardResponse:
+    card = session.get(Card, UUID(card_id))
     if not card or card.author_id != current_user.id:
         raise HTTPException(status_code=404, detail="Card not found")
-
-    card.front = card_arg.front
-    card.back = card_arg.back
-    card.appearsCount = card_arg.appearsCount
-    card.createdAt = card_arg.createdAt
-    card.nextReviewAt = card_arg.nextReviewAt
+    if card_arg.front:
+        card.front = card_arg.front
+    if card_arg.back:
+        card.back = card_arg.back
+    if card_arg.appearsCount:
+        card.appearsCount = card_arg.appearsCount
+    if card_arg.nextReviewAt:
+        card.nextReviewAt = card_arg.nextReviewAt
 
     session.commit()
     session.refresh(card)
@@ -102,12 +104,11 @@ def review_card(
     if not card or card.author_id != current_user.id:
         raise HTTPException(status_code=404, detail="Card not found")
 
-
     card.nextReviewAt = max(card.nextReviewAt.date(), card_arg.nextReviewAt.date())
     card.appearsCount = max(card.appearsCount, card_arg.appearsCount)
     card_review_log = CardReviewLog(
         card_id=card.id,
-        user_id=UUID(current_user.id),
+        user_id=current_user.id,
         review_at=card_arg.reviewAt,
         next_review_at=card_arg.nextReviewAt,
         difficult=card_arg.difficult,
@@ -122,10 +123,10 @@ def review_card(
 @router.delete("/{card_id}/delete")
 def delete_card(
     current_user: CurrentUser,
-    card_id: int,
+    card_id: str,
     session: sqlite_service.SessionDep,
 ):
-    card = session.get(Card, card_id)
+    card = session.get(Card, UUID(card_id))
     if not card or card.author_id != current_user.id:
         raise HTTPException(status_code=404, detail="Card not found")
 

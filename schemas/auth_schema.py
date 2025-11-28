@@ -1,5 +1,5 @@
-from datetime import datetime
 from typing import Optional
+from uuid import UUID
 
 from pydantic import BaseModel, EmailStr
 
@@ -8,6 +8,7 @@ class SignUpRequest(BaseModel):
     email: EmailStr
     password: str
     username: str
+    name: str
 
     class Config:
         json_schema_extra = {
@@ -15,6 +16,7 @@ class SignUpRequest(BaseModel):
                 "email": "user@example.com",
                 "password": "strongPassword123!",
                 "username": "johndoe",
+                "name": "John Doe",
             }
         }
 
@@ -42,9 +44,10 @@ class TokenResponse(BaseModel):
 
 
 class UserResponse(BaseModel):
-    id: str
+    id: UUID
     email: str
     username: Optional[str] = None
+    name: str
 
     class Config:
         json_schema_extra = {
@@ -52,6 +55,7 @@ class UserResponse(BaseModel):
                 "id": "550e8400-e29b-41d4-a716-446655440000",
                 "email": "user@example.com",
                 "username": "johndoe",
+                "name": "John Doe",
             }
         }
 
@@ -67,6 +71,7 @@ class AuthResponse(BaseModel):
                     "id": "550e8400-e29b-41d4-a716-446655440000",
                     "email": "user@example.com",
                     "username": "johndoe",
+                    "name": "John Doe",
                 },
                 "session": {
                     "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",

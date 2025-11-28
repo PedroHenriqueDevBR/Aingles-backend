@@ -26,6 +26,23 @@ class CardResponse(SQLModel):
         orm_mode = True
 
 
+class CardUpdateRequest(BaseModel):
+    front: Optional[str] = None
+    back: Optional[str] = None
+    appearsCount: Optional[int] = None
+    nextReviewAt: Optional[datetime] = None
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "front": "What is the capital of France?",
+                "back": "Paris",
+                "appearsCount": 3,
+                "nextReviewAt": "2024-07-01T12:00:00Z",
+            }
+        }
+
+
 class CardReviewUpdate(BaseModel):
     reviewAt: datetime
     nextReviewAt: datetime
