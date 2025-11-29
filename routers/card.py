@@ -33,8 +33,11 @@ def get_card(
     session: sqlite_service.SessionDep,
 ) -> CardResponse:
     card = session.get(Card, UUID(card_id))
-    if not card or card.author_id != current_user.id:
-        return HTTPException(status_code=404, detail="Card not found!")
+    if not card:
+        raise HTTPException(status_code=404, detail="Card not found!")
+    
+    if card.author_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Card not found!")
 
     return card
 
@@ -129,6 +132,9 @@ def delete_card(
     card = session.get(Card, UUID(card_id))
     if not card or card.author_id != current_user.id:
         raise HTTPException(status_code=404, detail="Card not found")
+    
+    for review in card.reviews:
+        session.delete(review)
 
     session.delete(card)
     session.commit()
