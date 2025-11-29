@@ -111,10 +111,7 @@ class AuthService:
             )
 
             user_data = UserResponse(
-                id=new_user.id,
-                email=new_user.email,
-                username=new_user.username,
-                name=new_user.name,
+                id=new_user.id
             )
 
             session_data = TokenResponse(
@@ -185,9 +182,7 @@ class AuthService:
             )
 
             user_data = UserResponse(
-                id=user.id,
-                email=user.email,
-                username=user.username,
+                id=user.id
             )
 
             session_data = TokenResponse(
@@ -226,50 +221,6 @@ class AuthService:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"An error occurred during sign out: {str(e)}",
-            ) from e
-
-    async def get_user(self, access_token: str) -> UserResponse:
-        try:
-            payload = jwt.decode(access_token, SECRET_KEY, algorithms=[ALGORITHM])
-            user_id: str = payload.get("sub")
-
-            if user_id is None:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid or expired token",
-                )
-
-            session = next(get_session())
-            user = session.exec(select(User).where(User.id == int(user_id))).first()
-
-            if not user:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="User not found",
-                )
-
-            session.close()
-
-            return UserResponse(
-                id=user.id,
-                email=user.email,
-                username=user.username,
-                created_at=user.created_at,
-                last_sign_in_at=user.last_sign_in_at,
-                email_confirmed_at=user.email_confirmed_at,
-            )
-
-        except JWTError as err:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid or expired token",
-            ) from err
-        except HTTPException:
-            raise
-        except Exception as e:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"An error occurred while getting user: {str(e)}",
             ) from e
 
     async def refresh_token(self, refresh_token: str) -> TokenResponse:

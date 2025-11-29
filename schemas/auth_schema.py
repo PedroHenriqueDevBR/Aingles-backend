@@ -45,17 +45,11 @@ class TokenResponse(BaseModel):
 
 class UserResponse(BaseModel):
     id: UUID
-    email: str
-    username: Optional[str] = None
-    name: str
 
     class Config:
         json_schema_extra = {
             "example": {
-                "id": "550e8400-e29b-41d4-a716-446655440000",
-                "email": "user@example.com",
-                "username": "johndoe",
-                "name": "John Doe",
+                "id": "550e8400-e29b-41d4-a716-446655440000"
             }
         }
 
@@ -68,10 +62,7 @@ class AuthResponse(BaseModel):
         json_schema_extra = {
             "example": {
                 "user": {
-                    "id": "550e8400-e29b-41d4-a716-446655440000",
-                    "email": "user@example.com",
-                    "username": "johndoe",
-                    "name": "John Doe",
+                    "id": "550e8400-e29b-41d4-a716-446655440000"
                 },
                 "session": {
                     "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",

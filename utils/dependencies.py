@@ -1,15 +1,15 @@
-from typing import Annotated
 import os
+from typing import Annotated
 from uuid import UUID
 
 from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from sqlmodel import select
 
 from models.user_model import User
-from services.sqlite_service import get_session
 from schemas.auth_schema import UserResponse
+from services.sqlite_service import get_session
 
 # Security scheme for JWT Bearer tokens
 security = HTTPBearer()
@@ -33,10 +33,8 @@ async def get_current_user(
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id: str = payload.get("sub")
-        email: str = payload.get("email")
-        username: str = payload.get("username")
 
-        if user_id is None or email is None or username is None:
+        if user_id is None:
             raise credentials_exception
 
         session = next(get_session())
@@ -45,13 +43,7 @@ async def get_current_user(
         if not user:
             raise credentials_exception
 
-        user_response = UserResponse(
-            id=user.id,
-            email=user.email,
-            username=user.username,
-            name=user.name or "",
-        )
-
+        user_response = UserResponse(id=user.id)
         session.close()
         return user_response
 

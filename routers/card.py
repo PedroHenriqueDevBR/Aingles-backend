@@ -1,12 +1,14 @@
 from uuid import UUID
+
 from fastapi import APIRouter, HTTPException, Response
+from sqlalchemy.orm import selectinload
 from sqlmodel import select
 
 from models.card_models import Card, CardReviewLog
-from schemas.card_schema import CardResponse, CardReviewUpdate, CardUpdateRequest
+from schemas.card_schema import (CardResponse, CardReviewLogResponse,
+                                 CardReviewUpdate, CardUpdateRequest)
 from services import sqlite_service
 from utils.dependencies import CurrentUser
-from sqlalchemy.orm import selectinload
 
 router = APIRouter()
 
@@ -35,7 +37,7 @@ def get_card(
     card = session.get(Card, UUID(card_id))
     if not card:
         raise HTTPException(status_code=404, detail="Card not found!")
-    
+
     if card.author_id != current_user.id:
         raise HTTPException(status_code=404, detail="Card not found!")
 
@@ -96,7 +98,11 @@ def update_card(
     return card
 
 
-@router.patch("/{card_id}/review")
+@router.patch(
+    "/{card_id}/review",
+    description="Review a card and log the review details",
+    summary="difficult: 1, # 1 - EASY, 2 - MEDIUM, 3 - HARD, 4 - IMPOSSIBLE",
+)
 def review_card(
     current_user: CurrentUser,
     card_id: str,
@@ -132,7 +138,7 @@ def delete_card(
     card = session.get(Card, UUID(card_id))
     if not card or card.author_id != current_user.id:
         raise HTTPException(status_code=404, detail="Card not found")
-    
+
     for review in card.reviews:
         session.delete(review)
 
