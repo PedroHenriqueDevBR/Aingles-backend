@@ -13,7 +13,6 @@ class Article(SQLModel, table=True):
     content: str = Field(default="")
     created_at: datetime | None = Field(default=datetime.now())
     author_id: UUID | None = Field(
-        default_factory=uuid4,
         foreign_key="user.id",
     )
 

@@ -1,4 +1,5 @@
 import logging
+from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Response
 from sqlmodel import Session, select
@@ -30,11 +31,11 @@ def create_article(
 @router.put("/{article_id}/update")
 def update_article(
     current_user: CurrentUser,
-    article_id: int,
+    article_id: str,
     article_args: Article,
     session: sqlite_service.SessionDep,
 ) -> Article:
-    article = session.get(Article, article_id)
+    article = session.get(Article, UUID(article_id))
     if not article or article.author_id != current_user.id:
         raise HTTPException(status_code=404, detail="Article not found")
 
@@ -52,7 +53,7 @@ def get_articles(
 ) -> list[Article]:
     articles = session.exec(
         select(Article)
-        .where(Article.author_id == current_user.id or Article.author_id == None)
+        .where((Article.author_id == current_user.id) | (Article.author_id == None))
         .offset(0)
         .limit(100)
     ).all()
@@ -61,9 +62,9 @@ def get_articles(
 
 @router.delete("/{article_id}/delete")
 def delete_article(
-    current_user: CurrentUser, article_id: int, session: sqlite_service.SessionDep
+    current_user: CurrentUser, article_id: str, session: sqlite_service.SessionDep,
 ) -> None:
-    article = session.get(Article, article_id)
+    article = session.get(Article, UUID(article_id))
     if not article or article.author_id != current_user.id:
         raise HTTPException(status_code=404, detail="Article not found")
 
@@ -83,10 +84,10 @@ async def load_articles():
 @router.post("/{article_id}/load_content")
 def load_article_content(
     current_user: CurrentUser,
-    article_id: int,
+    article_id: str,
     session: sqlite_service.SessionDep,
 ) -> Article:
-    article = session.get(Article, article_id)
+    article = session.get(Article, UUID(article_id))
     if not article:
         raise HTTPException(status_code=404, detail="Article not found")
 
