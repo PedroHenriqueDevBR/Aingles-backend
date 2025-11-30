@@ -3,9 +3,9 @@
     "id": 0,
     "front": "",
     "back": "",
-    "appearsCount": 0,
-    "createdAt": "2025-11-09T04:39:39.105347",
-    "nextReviewAt": "2025-11-10T04:39:39.105717",
+    "appears_count": 0,
+    "created_at": "2025-11-09T04:39:39.105347",
+    "next_review_at": "2025-11-10T04:39:39.105717",
     "author_id": "string"
 }
 """

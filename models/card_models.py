@@ -22,9 +22,9 @@ class Card(SQLModel, table=True):
     id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
     front: str | None = Field(default="", index=True)
     back: str | None = Field(default="")
-    appearsCount: int | None = Field(default=0)
-    createdAt: datetime | None = Field(default=datetime.now())
-    nextReviewAt: datetime | None = Field(default=datetime.now() + timedelta(days=1))
+    appears_count: int | None = Field(default=0)
+    created_at: datetime | None = Field(default=datetime.now())
+    next_review_at: datetime | None = Field(default=datetime.now() + timedelta(days=1))
     author_id: UUID | None = Field(default=None, index=True)
 
     reviews: list["CardReviewLog"] = Relationship(back_populates="card")

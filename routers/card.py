@@ -88,10 +88,10 @@ def update_card(
         card.front = card_arg.front
     if card_arg.back:
         card.back = card_arg.back
-    if card_arg.appearsCount:
-        card.appearsCount = card_arg.appearsCount
-    if card_arg.nextReviewAt:
-        card.nextReviewAt = card_arg.nextReviewAt
+    if card_arg.appears_count:
+        card.appears_count = card_arg.appears_count
+    if card_arg.next_review_at:
+        card.next_review_at = card_arg.next_review_at
 
     session.commit()
     session.refresh(card)
@@ -113,13 +113,13 @@ def review_card(
     if not card or card.author_id != current_user.id:
         raise HTTPException(status_code=404, detail="Card not found")
 
-    card.nextReviewAt = max(card.nextReviewAt.date(), card_arg.nextReviewAt.date())
-    card.appearsCount = max(card.appearsCount, card_arg.appearsCount)
+    card.next_review_at = max(card.next_review_at.date(), card_arg.next_review_at.date())
+    card.appears_count = max(card.appears_count, card_arg.appears_count)
     card_review_log = CardReviewLog(
         card_id=card.id,
         user_id=current_user.id,
         review_at=card_arg.reviewAt,
-        next_review_at=card_arg.nextReviewAt,
+        next_review_at=card_arg.next_review_at,
         difficult=card_arg.difficult,
     )
 
