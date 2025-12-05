@@ -1,9 +1,11 @@
 import os
+from uuid import UUID
 
 from dotenv import load_dotenv
 from openai import OpenAI
 
 from models.chat_models import Chat, ChatMessage
+from schemas.chat_schema import CreateChatRequest
 
 load_dotenv()
 
@@ -25,7 +27,7 @@ Your main goal: help the user practice English through conversation, correction,
 class AIService:
 
     def __init__(self):
-        self.model = os.getenv("AI_MODEL", "gpt-4o-mini")
+        self.model = os.getenv("AI_MODEL", "gpt-5-nano")
         self.token = os.getenv("AI_TOKEN", "")
         self.client = OpenAI(api_key=self.token)
 
@@ -35,7 +37,13 @@ class AIService:
             history.append({"role": message.role, "content": message.content})
         return history
 
-    def initialize_chat(self, chat: Chat, theme: str = "") -> Chat:
+    def initialize_chat(
+        self,
+        user_id: UUID,
+        chat_request: CreateChatRequest,
+        theme: str = "",
+    ) -> Chat:
+        chat = Chat(title=chat_request.title, author_id=user_id)
         system_content = (
             START_MESSAGE.replace("$theme", theme)
             if theme
