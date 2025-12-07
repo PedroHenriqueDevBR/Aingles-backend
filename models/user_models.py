@@ -15,6 +15,7 @@ class User(SQLModel, table=True):
     hashed_password: str = Field(nullable=False)
     is_active: bool = Field(default=True)
     is_superuser: bool = Field(default=False)
+    has_ai_access: bool = Field(default=False)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: Optional[datetime] = Field(default=None)
     last_sign_in_at: Optional[datetime] = Field(default=None)

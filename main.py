@@ -6,7 +6,7 @@ from apscheduler.triggers.cron import CronTrigger
 from dotenv import load_dotenv
 from fastapi import FastAPI
 
-from routers import articles, auth, card, core
+from routers import articles, auth, card, core, chat
 from services import sqlite_service
 
 load_dotenv()
@@ -69,4 +69,9 @@ app.include_router(
     card.router,
     prefix="/card",
     tags=["Cards"],
+)
+app.include_router(
+    chat.router,
+    prefix="/chat",
+    tags=["Chat"],
 )

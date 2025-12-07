@@ -5,6 +5,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from schemas.auth_schema import (
     AuthResponse,
+    AuthenticatedUserResponse,
     MessageResponse,
     RefreshTokenRequest,
     SignInRequest,
@@ -93,7 +94,7 @@ async def sign_out(
 
 @router.get(
     "/me",
-    response_model=UserResponse,
+    response_model=AuthenticatedUserResponse,
     status_code=status.HTTP_200_OK,
     summary="Get current user information",
     description="""
@@ -102,12 +103,7 @@ async def sign_out(
     Requires a valid access token in the Authorization header.
     """,
 )
-async def get_me(current_user: CurrentUser) -> UserResponse:
-    """
-    Get the current authenticated user's information.
-
-    Returns user details including email, username, and timestamps.
-    """
+async def get_me(current_user: CurrentUser) -> AuthenticatedUserResponse:
     return current_user
 
 
@@ -124,14 +120,8 @@ async def get_me(current_user: CurrentUser) -> UserResponse:
     """,
 )
 async def refresh_token(request: RefreshTokenRequest) -> TokenResponse:
-    """
-    Refresh the access token.
-
-    - **refresh_token**: Valid refresh token from sign in/sign up response
-
-    Returns new access and refresh tokens.
-    """
-    return await auth_service.refresh_token(request.refresh_token)
+    token: str = request.refresh_token
+    return await auth_service.refresh_token(token)
 
 
 @router.get(
@@ -146,9 +136,4 @@ async def refresh_token(request: RefreshTokenRequest) -> TokenResponse:
     """,
 )
 async def verify_token(current_user: CurrentUser) -> MessageResponse:
-    """
-    Verify if the current token is valid.
-
-    Returns a success message if the token is valid, otherwise returns 401.
-    """
     return MessageResponse(message=f"Token is valid for user: {current_user.email}")

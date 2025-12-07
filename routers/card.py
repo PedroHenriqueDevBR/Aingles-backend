@@ -20,7 +20,7 @@ def get_all_cards(
 ) -> list[Card]:
     cards = session.exec(
         select(Card)
-        .filter(Card.author_id == current_user.id)
+        .filter(Card.author_id == current_user.uuid)
         .options(selectinload(Card.reviews))
         .offset(0)
         .limit(100)
@@ -38,7 +38,7 @@ def get_card(
     if not card:
         raise HTTPException(status_code=404, detail="Card not found!")
 
-    if card.author_id != current_user.id:
+    if card.author_id != current_user.uuid:
         raise HTTPException(status_code=404, detail="Card not found!")
 
     return card
@@ -50,7 +50,7 @@ def create_card(
     card: Card,
     session: sqlite_service.SessionDep,
 ) -> CardResponse:
-    card.author_id = current_user.id
+    card.author_id = current_user.uuid
     session.add(card)
     session.commit()
     session.refresh(card)
@@ -64,7 +64,7 @@ def create_all_cards(
     session: sqlite_service.SessionDep,
 ) -> list[Card]:
     for card in cards:
-        card.author_id = current_user.id
+        card.author_id = current_user.uuid
 
     session.add_all(cards)
     session.commit()
@@ -82,7 +82,7 @@ def update_card(
     session: sqlite_service.SessionDep,
 ) -> CardResponse:
     card = session.get(Card, UUID(card_id))
-    if not card or card.author_id != current_user.id:
+    if not card or card.author_id != current_user.uuid:
         raise HTTPException(status_code=404, detail="Card not found")
     if card_arg.front:
         card.front = card_arg.front
@@ -101,7 +101,6 @@ def update_card(
 @router.patch(
     "/{card_id}/review",
     description="Review a card and log the review details",
-    summary="difficult: 1, # 1 - EASY, 2 - MEDIUM, 3 - HARD, 4 - IMPOSSIBLE",
 )
 def review_card(
     current_user: CurrentUser,
@@ -110,14 +109,14 @@ def review_card(
     session: sqlite_service.SessionDep,
 ) -> CardResponse:
     card = session.get(Card, UUID(card_id))
-    if not card or card.author_id != current_user.id:
+    if not card or card.author_id != current_user.uuid:
         raise HTTPException(status_code=404, detail="Card not found")
 
     card.next_review_at = max(card.next_review_at.date(), card_arg.next_review_at.date())
     card.appears_count = max(card.appears_count, card_arg.appears_count)
     card_review_log = CardReviewLog(
         card_id=card.id,
-        user_id=current_user.id,
+        user_id=current_user.uuid,
         review_at=card_arg.reviewAt,
         next_review_at=card_arg.next_review_at,
         difficult=card_arg.difficult,
@@ -136,7 +135,7 @@ def delete_card(
     session: sqlite_service.SessionDep,
 ):
     card = session.get(Card, UUID(card_id))
-    if not card or card.author_id != current_user.id:
+    if not card or card.author_id != current_user.uuid:
         raise HTTPException(status_code=404, detail="Card not found")
 
     for review in card.reviews:

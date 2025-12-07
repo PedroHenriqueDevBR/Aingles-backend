@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, Response
 from sqlmodel import Session, select
 
-from models.article_model import Article
+from models.article_models import Article
 from services import sqlite_service
 from services.load_articles_service import LoadArticlesService
 from services.sqlite_service import engine
@@ -21,7 +21,7 @@ def create_article(
     article: Article,
     session: sqlite_service.SessionDep,
 ) -> Article:
-    article.author_id = current_user.id
+    article.author_id = current_user.uuid
     session.add(article)
     session.commit()
     session.refresh(article)
@@ -36,7 +36,7 @@ def update_article(
     session: sqlite_service.SessionDep,
 ) -> Article:
     article = session.get(Article, UUID(article_id))
-    if not article or article.author_id != current_user.id:
+    if not article or article.author_id != current_user.uuid:
         raise HTTPException(status_code=404, detail="Article not found")
 
     article.title = article_args.title
@@ -53,7 +53,7 @@ def get_articles(
 ) -> list[Article]:
     articles = session.exec(
         select(Article)
-        .where((Article.author_id == current_user.id) | (Article.author_id == None))
+        .where((Article.author_id == current_user.uuid) | (Article.author_id == None))
         .offset(0)
         .limit(100)
     ).all()
@@ -65,7 +65,7 @@ def delete_article(
     current_user: CurrentUser, article_id: str, session: sqlite_service.SessionDep,
 ) -> None:
     article = session.get(Article, UUID(article_id))
-    if not article or article.author_id != current_user.id:
+    if not article or article.author_id != current_user.uuid:
         raise HTTPException(status_code=404, detail="Article not found")
 
     session.delete(article)
@@ -92,7 +92,7 @@ def load_article_content(
         raise HTTPException(status_code=404, detail="Article not found")
 
     article_has_author = article.author_id is not None
-    if article_has_author and article.author_id != current_user.id:
+    if article_has_author and article.author_id != current_user.uuid:
         raise HTTPException(status_code=404, detail="Article not found")
 
     service = LoadArticlesService()
