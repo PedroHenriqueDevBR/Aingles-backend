@@ -7,8 +7,9 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from sqlmodel import select
 
-from models.user_model import User
-from schemas.auth_schema import UserResponse
+from models.auth_models import TokenBlacklist
+from models.user_models import User
+from schemas.auth_schema import AuthenticatedUserResponse
 from services.sqlite_service import get_session
 
 # Security scheme for JWT Bearer tokens
@@ -21,8 +22,21 @@ ALGORITHM = "HS256"
 
 async def get_current_user(
     credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)],
-) -> UserResponse:
+) -> AuthenticatedUserResponse:
+    session = next(get_session())
     token = credentials.credentials
+
+    blacklist_entry = session.exec(
+        select(TokenBlacklist).where(TokenBlacklist.token == token)
+    ).first()
+
+    if blacklist_entry:
+        session.close()
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has been revoked",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -37,13 +51,19 @@ async def get_current_user(
         if user_id is None:
             raise credentials_exception
 
-        session = next(get_session())
         user = session.exec(select(User).where(User.id == UUID(user_id))).first()
 
         if not user:
             raise credentials_exception
 
-        user_response = UserResponse(id=user.id)
+        user_response = AuthenticatedUserResponse(
+            id=str(user.id),
+            email=user.email or "",
+            username=user.username,
+            name=user.name or "",
+            is_active=user.is_active,
+            is_superuser=user.is_superuser,
+        )
         session.close()
         return user_response
 
@@ -58,8 +78,8 @@ async def get_current_user(
 
 
 async def get_current_active_user(
-    current_user: Annotated[UserResponse, Depends(get_current_user)],
-) -> UserResponse:
+    current_user: Annotated[AuthenticatedUserResponse, Depends(get_current_user)],
+) -> AuthenticatedUserResponse:
     if not current_user.email_confirmed_at:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -69,5 +89,7 @@ async def get_current_active_user(
     return current_user
 
 
-CurrentUser = Annotated[UserResponse, Depends(get_current_user)]
-CurrentActiveUser = Annotated[UserResponse, Depends(get_current_active_user)]
+CurrentUser = Annotated[AuthenticatedUserResponse, Depends(get_current_user)]
+CurrentActiveUser = Annotated[
+    AuthenticatedUserResponse, Depends(get_current_active_user)
+]
