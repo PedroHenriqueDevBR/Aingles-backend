@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, Response
 from sqlmodel import Session, select
 
-from models.article_model import Article
+from models.article_models import Article
 from services import sqlite_service
 from services.load_articles_service import LoadArticlesService
 from services.sqlite_service import engine

@@ -101,7 +101,6 @@ def update_card(
 @router.patch(
     "/{card_id}/review",
     description="Review a card and log the review details",
-    summary="difficult: 1, # 1 - EASY, 2 - MEDIUM, 3 - HARD, 4 - IMPOSSIBLE",
 )
 def review_card(
     current_user: CurrentUser,

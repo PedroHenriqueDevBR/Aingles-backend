@@ -2,8 +2,7 @@ import logging
 
 from sqlmodel import select
 
-from models.article_model import Article
-from services.onesignal_service import send_notification
+from models.article_models import Article
 from services.sqlite_service import SessionDep
 from services.techcrunch_service import TechCrunchResponse, TechCrunchService
 
@@ -43,11 +42,6 @@ class LoadArticlesService:
 
         if len(new_articles) > 0:
             logger.info(f"Loaded {len(new_articles)} new articles.")
-            send_notification(
-                title="News to read",
-                message=f"{len(new_articles)} new articles have been loaded.",
-                data=new_articles,
-            )
 
         logger.info("Finished loading latest articles.")
 
