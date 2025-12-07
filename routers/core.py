@@ -6,7 +6,7 @@ router = APIRouter()
 
 @router.get("/")
 def read_root() -> dict[str, Union[str, int]]:
-    return {"message": "Hello, World!", "status": 200}
+    return {"message": "Hi, I'm Aingles Backend", "status": 200}
 
 
 @router.get("/health")
