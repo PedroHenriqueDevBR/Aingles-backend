@@ -25,9 +25,13 @@ def upgrade() -> None:
         "token_reference",
         sa.Column("access_token", sa.String(), primary_key=True),
         sa.Column("refresh_token", sa.String(), primary_key=True),
+        if_not_exists=True,
     )
 
 
 def downgrade() -> None:
     """Downgrade schema."""
-    op.drop_table("token_reference")
+    op.drop_table(
+        "token_reference",
+        if_exists=True,
+    )

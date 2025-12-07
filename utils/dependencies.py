@@ -58,11 +58,13 @@ async def get_current_user(
 
         user_response = AuthenticatedUserResponse(
             id=str(user.id),
+            uuid=user.id,
             email=user.email or "",
             username=user.username,
             name=user.name or "",
             is_active=user.is_active,
             is_superuser=user.is_superuser,
+            has_ai_access=user.has_ai_access,
         )
         session.close()
         return user_response

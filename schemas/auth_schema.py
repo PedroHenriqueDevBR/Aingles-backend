@@ -55,11 +55,13 @@ class UserResponse(BaseModel):
         
 class AuthenticatedUserResponse(BaseModel):
     id: str
+    uuid: UUID
     email: str
     username: str
     name: str
     is_active: bool
     is_superuser: bool
+    has_ai_access: bool
 
     class Config:
         json_schema_extra = {

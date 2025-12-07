@@ -1,10 +1,11 @@
+from uuid import UUID
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import selectinload
 from sqlmodel import select
 
 from models.chat_models import Chat, ChatMessage
-from schemas.chat_schema import CreateChatRequest
+from schemas.chat_schema import ChatMessageRequest, ChatWithMessagesResponse, CreateChatRequest, MessageResponse
 from services import sqlite_service, ai_service
 
 from utils.dependencies import CurrentUser
@@ -17,10 +18,32 @@ def get_my_chats(
     current_user: CurrentUser,
     session: sqlite_service.SessionDep,
 ) -> list[Chat]:
+    if not current_user.has_ai_access:
+        raise HTTPException(status_code=403, detail="AI access is required to view chats.")
+
     chats = session.exec(
-        select(Chat).filter(Chat.author_id == current_user.id).offset(0).limit(100)
+        select(Chat).filter(Chat.author_id == current_user.uuid).offset(0).limit(100)
     ).all()
     return chats
+
+
+@router.get("/{chat_id}/messages")
+def chat_messages(
+    chat_id: str,
+    current_user: CurrentUser,
+    session: sqlite_service.SessionDep,
+) -> ChatWithMessagesResponse:
+    if not current_user.has_ai_access:
+        raise HTTPException(status_code=403, detail="AI access is required to view chats.")
+    
+    chat = session.exec(
+        select(Chat)
+        .options(selectinload(Chat.messages))
+        .filter(Chat.id == UUID(chat_id))
+        .filter(Chat.author_id == current_user.uuid)
+    ).first()
+
+    return chat
 
 
 @router.post("/")
@@ -29,7 +52,10 @@ def create_chat(
     session: sqlite_service.SessionDep,
     chat_data: CreateChatRequest,
 ) -> Chat:
-    chat = ai_service.AIService().initialize_chat(current_user.id, chat_data)
+    if not current_user.has_ai_access:
+        raise HTTPException(status_code=403, detail="AI access is required to view chats.")
+
+    chat = ai_service.AIService().initialize_chat(current_user.uuid, chat_data)
     session.add(chat)
     session.commit()
     session.refresh(chat)
@@ -40,21 +66,26 @@ def create_chat(
 @router.post("/{chat_id}/message/")
 def send_message(
     chat_id: str,
+    content: ChatMessageRequest,
     current_user: CurrentUser,
     session: sqlite_service.SessionDep,
-    message_content: str,
-) -> ChatMessage:
+) -> MessageResponse:
+    if not current_user.has_ai_access:
+        raise HTTPException(status_code=403, detail="AI access is required to view chats.")
+
     chat = session.exec(
         select(Chat)
-        .options(selectinload(Chat.messages))
-        .filter(Chat.id == chat_id)
-        .filter(Chat.author_id == current_user.id)
+        .filter(Chat.id == UUID(chat_id))
+        .filter(Chat.author_id == current_user.uuid)
     ).first()
 
     if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
 
-    assistant_message = ai_service.AIService().send_message(chat, message_content)
+    assistant_message = ai_service.AIService().send_message(
+        chat,
+        content.message,
+    )
 
     session.add(chat)
     session.commit()
@@ -68,20 +99,26 @@ def send_message_stream(
     chat_id: str,
     current_user: CurrentUser,
     session: sqlite_service.SessionDep,
-    message_content: str,
-):
+    content: ChatMessageRequest,
+) -> MessageResponse:
+    if not current_user.has_ai_access:
+        raise HTTPException(status_code=403, detail="AI access is required to view chats.")
+
     chat = session.exec(
         select(Chat)
         .options(selectinload(Chat.messages))
-        .filter(Chat.id == chat_id)
-        .filter(Chat.author_id == current_user.id)
+        .filter(Chat.id == UUID(chat_id))
+        .filter(Chat.author_id == current_user.uuid)
     ).first()
 
     if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
 
     def generate():
-        for chunk in ai_service.AIService().send_message_stream(chat, message_content):
+        for chunk in ai_service.AIService().send_message_stream(
+            chat,
+            content.message,
+        ):
             yield chunk
 
         session.add(chat)

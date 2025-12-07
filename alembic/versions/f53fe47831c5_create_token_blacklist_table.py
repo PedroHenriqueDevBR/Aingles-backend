@@ -24,8 +24,12 @@ def upgrade() -> None:
         "tokenblacklist",
         sa.Column("token", sa.String(), nullable=False),
         sa.PrimaryKeyConstraint("token"),
+        if_not_exists=True,
     )
 
 
 def downgrade() -> None:
-    op.drop_table("tokenblacklist")
+    op.drop_table(
+        "tokenblacklist",
+        if_exists=True,
+    )

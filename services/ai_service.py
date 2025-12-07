@@ -4,7 +4,7 @@ from uuid import UUID
 from dotenv import load_dotenv
 from openai import OpenAI
 
-from models.chat_models import Chat, ChatMessage
+from models.chat_models import Chat, ChatMessage, MessageRole
 from schemas.chat_schema import CreateChatRequest
 
 load_dotenv()
@@ -50,7 +50,7 @@ class AIService:
             else START_MESSAGE.replace("$theme", "general conversation")
         )
         system_message = ChatMessage(
-            role=ChatMessage.DEVELOPER,
+            role=MessageRole.DEVELOPER,
             content=system_content,
             chat_id=chat.id,
         )
@@ -59,7 +59,7 @@ class AIService:
 
     def send_message(self, chat: Chat, user_message_content: str) -> ChatMessage:
         user_message = ChatMessage(
-            role=ChatMessage.USER,
+            role=MessageRole.USER,
             content=user_message_content,
             chat_id=chat.id,
         )
@@ -68,13 +68,12 @@ class AIService:
         response = self.client.chat.completions.create(
             model=self.model,
             messages=messages,
-            temperature=0.7,
-            max_tokens=500,
+            max_completion_tokens=500,
         )
 
         assistant_content = response.choices[0].message.content
         assistant_message = ChatMessage(
-            role=ChatMessage.ASSISTANT,
+            role=MessageRole.ASSISTANT,
             content=assistant_content,
             chat_id=chat.id,
         )
@@ -84,7 +83,7 @@ class AIService:
 
     def send_message_stream(self, chat: Chat, user_message_content: str):
         user_message = ChatMessage(
-            role=ChatMessage.USER,
+            role=MessageRole.USER,
             content=user_message_content,
             chat_id=chat.id,
         )
@@ -94,21 +93,22 @@ class AIService:
         stream = self.client.chat.completions.create(
             model=self.model,
             messages=messages,
-            temperature=0.7,
-            max_tokens=500,
             stream=True,
         )
 
         full_response = ""
         for chunk in stream:
-            if chunk.choices[0].delta.content:
+            if chunk.choices[0].delta.content is not None:
                 content = chunk.choices[0].delta.content
                 full_response += content
                 yield content
 
-        assistant_message = ChatMessage(
-            role=ChatMessage.ASSISTANT,
-            content=full_response,
-            chat_id=chat.id,
-        )
-        chat.messages.append(assistant_message)
+        if len(full_response) > 0:
+            assistant_message = ChatMessage(
+                role=MessageRole.ASSISTANT,
+                content=full_response,
+                chat_id=chat.id,
+            )
+            chat.messages.append(assistant_message)
+        else:
+            chat.messages.remove(user_message)
