@@ -3,6 +3,8 @@ from uuid import UUID
 from pydantic import BaseModel
 from sqlmodel import SQLModel
 
+from models.chat_models import ChatMessage
+
 
 class CreateChatRequest(BaseModel):
     title: str
@@ -34,6 +36,11 @@ class MessageResponse(SQLModel):
 
     class Config:
         orm_mode = True
+
+
+class ChatMessageResponse(BaseModel):
+    user_message: ChatMessage
+    assistant_message: ChatMessage
 
 
 class ChatWithMessagesResponse(SQLModel):

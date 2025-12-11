@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 
 from models.chat_models import Chat, ChatMessage, MessageRole
-from schemas.chat_schema import CreateChatRequest
+from schemas.chat_schema import ChatMessageResponse, CreateChatRequest
 
 load_dotenv()
 
@@ -31,7 +31,7 @@ class AIService:
         self.token = os.getenv("AI_TOKEN", "")
         self.client = OpenAI(api_key=self.token)
 
-    def format_history(self, chat: Chat) -> list[dict]:
+    def history_message_from_chat(self, chat: Chat) -> list[dict]:
         history = []
         for message in chat.messages:
             history.append({"role": message.role, "content": message.content})
@@ -57,18 +57,19 @@ class AIService:
         chat.messages.append(system_message)
         return chat
 
-    def send_message(self, chat: Chat, user_message_content: str) -> ChatMessage:
+    def send_message(
+        self, chat: Chat, user_message_content: str
+    ) -> ChatMessageResponse:
         user_message = ChatMessage(
             role=MessageRole.USER,
             content=user_message_content,
             chat_id=chat.id,
         )
+        
         chat.messages.append(user_message)
-        messages = self.format_history(chat)
         response = self.client.chat.completions.create(
             model=self.model,
-            messages=messages,
-            max_completion_tokens=500,
+            messages=self.history_message_from_chat(chat),
         )
 
         assistant_content = response.choices[0].message.content
@@ -77,9 +78,12 @@ class AIService:
             content=assistant_content,
             chat_id=chat.id,
         )
-        chat.messages.append(assistant_message)
 
-        return assistant_message
+        chat.messages.append(assistant_message)
+        return ChatMessageResponse(
+            user_message=user_message,
+            assistant_message=assistant_message,
+        )
 
     def send_message_stream(self, chat: Chat, user_message_content: str):
         user_message = ChatMessage(
@@ -89,7 +93,7 @@ class AIService:
         )
 
         chat.messages.append(user_message)
-        messages = self.format_history(chat)
+        messages = self.history_message_from_chat(chat)
         stream = self.client.chat.completions.create(
             model=self.model,
             messages=messages,
